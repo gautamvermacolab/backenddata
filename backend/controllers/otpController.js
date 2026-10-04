@@ -11,7 +11,9 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  }
+  },
+  connectionTimeout: 10000, // 10 second mein connection timeout ho jayega agar nahi chala
+  socketTimeout: 10000       // 10 second mein socket timeout
 });
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
