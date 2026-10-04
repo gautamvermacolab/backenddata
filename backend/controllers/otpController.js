@@ -35,23 +35,19 @@ exports.sendVerification = async (req, res) => {
   const { email, fullname } = req.body;
 
   try {
+    console.log("Step 1: OTP generate kiya ja raha hai for:", email);
     const emailOtp = generateOTP();
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
       subject: 'Heysharlo - Account Verification OTP',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #F8F6EF; border-radius: 10px;">
-          <h2 style="color: #006039;">Welcome to Heysharlo, ${fullname}!</h2>
-          <p>Your Email Verification code is:</p>
-          <h1 style="color: #C9A227; letter-spacing: 5px;">${emailOtp}</h1>
-          <p>This code will expire in 10 minutes.</p>
-        </div>
-      `
+      html: `...`
     };
 
+    console.log("Step 2: Nodemailer se email bhejne ki koshish ki ja rahi hai...");
     await transporter.sendMail(mailOptions);
+    console.log("Step 3: Email successfully bhej diya gaya hai! 🎉");
 
     await Otp.deleteMany({ email });
     await Otp.create({ email, otp: emailOtp });
@@ -59,10 +55,11 @@ exports.sendVerification = async (req, res) => {
     res.status(200).json({ success: true, message: "Email OTP sent successfully!" });
 
   } catch (error) {
-    console.error("Email Sending Error:", error);
+    console.error("❌ Email Sending Error Detail:", error);
     res.status(500).json({ success: false, message: "Error: " + error.message });
   }
 };
+
 
 exports.verifyEmailOTP = async (req, res) => {
   const { email, otp } = req.body;
