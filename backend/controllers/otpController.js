@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Otp = require('../models/otp');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
@@ -104,49 +105,13 @@ exports.registerFinal = async (req, res) => {
 
     await Otp.deleteMany({ email });
 
-    res.status(201).json({ success: true, message: "Account created successfully", userId: uniqueUserId });
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({ success: false, message: "Duplicate ID collision detected. Please try again." });
-    }
-    res.status(500).json({ success: false, message: "Database error: " + error.message });
-  }
-};
-
-const jwt = require('jsonwebtoken'); // 👈 JWT import karein (agar pehle se nahi hai)
-
-exports.registerFinal = async (req, res) => {
-  const { email, phone, fullname, password } = req.body;
-
-  try {
-    const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
-    if (existingUser) {
-      return res.status(400).json({ success: false, message: "User already exists with this email or phone" });
-    }
-
-    const uniqueUserId = await generateUniqueUserId();
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newUser = new User({ 
-      userId: uniqueUserId,
-      fullname, 
-      email, 
-      phone, 
-      password: hashedPassword 
-    });
-    
-    await newUser.save();
-
-    await Otp.deleteMany({ email });
-
-    // 🌟 1. Token generate karein taaki user auto-login ho jaye
+    // Token generate kar rahe hain taaki account register hote hi user login ho jaye
     const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
-    res.status(201).json({ 
+    res.status(200).json({ 
       success: true, 
       message: "Account created successfully", 
-      token, // 👈 Token response mein bheja
+      token,
       userId: uniqueUserId,
       fullname: newUser.fullname,
       email: newUser.email
