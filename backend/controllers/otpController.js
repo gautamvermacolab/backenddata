@@ -1,20 +1,11 @@
 const User = require('../models/User');
 const Otp = require('../models/otp');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  connectionTimeout: 10000, // 10 second mein connection timeout ho jayega agar nahi chala
-  socketTimeout: 10000       // 10 second mein socket timeout
-});
+// Resend initialization with your API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -37,31 +28,38 @@ exports.sendVerification = async (req, res) => {
   const { email, fullname } = req.body;
 
   try {
-    console.log("Step 1: OTP generate kiya ja raha hai for:", email);
     const emailOtp = generateOTP();
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    // Resend API call (Fast and never blocks on Render)
+    const { data, error } = await resend.emails.send({
+      from: 'onboarding@resend.dev', // Resend ka default testing sender
       to: email,
       subject: 'Heysharlo - Account Verification OTP',
-      html: `...`
-    };
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #F8F6EF; border-radius: 10px;">
+          <h2 style="color: #006039;">Welcome to Heysharlo, ${fullname}!</h2>
+          <p>Your Email Verification code is:</p>
+          <h1 style="color: #C9A227; letter-spacing: 5px;">${emailOtp}</h1>
+          <p>This code will expire in 10 minutes.</p>
+        </div>
+      `
+    });
 
-    console.log("Step 2: Nodemailer se email bhejne ki koshish ki ja rahi hai...");
-    await transporter.sendMail(mailOptions);
-    console.log("Step 3: Email successfully bhej diya gaya hai! 🎉");
+    if (error) {
+      console.error("Resend API Error:", error);
+      return res.status(500).json({ success: false, message: "Email send error: " + error.message });
+    }
 
     await Otp.deleteMany({ email });
     await Otp.create({ email, otp: emailOtp });
 
-    res.status(200).json({ success: true, message: "Email OTP sent successfully!" });
+    res.status(200).json({ success: true, message: "Email OTP sent successfully via Resend!" });
 
   } catch (error) {
-    console.error("❌ Email Sending Error Detail:", error);
+    console.error("Server Error in sendVerification:", error);
     res.status(500).json({ success: false, message: "Error: " + error.message });
   }
 };
-
 
 exports.verifyEmailOTP = async (req, res) => {
   const { email, otp } = req.body;
@@ -104,7 +102,6 @@ exports.registerFinal = async (req, res) => {
 
     await Otp.deleteMany({ email });
 
-    // Token generate kar rahe hain taaki account register hote hi user login ho jaye
     const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
     res.status(200).json({ 
